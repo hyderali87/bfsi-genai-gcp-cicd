@@ -1,8 +1,6 @@
 timeout: "86400s"
 
-serviceAccount: "projects/$PROJECT_ID/serviceAccounts/sa-cloudbuild-cicd@$PROJECT_ID.iam.gserviceaccount.com"
-
-logsBucket: "gs://$PROJECT_ID-cloudbuild-logs"
+logsBucket: "gs://bfsi-policy-dev-001-cloudbuild-logs"
 
 options:
   logging: GCS_ONLY
@@ -14,9 +12,9 @@ substitutions:
   _REGION: "us-central1"
   _AR_REPO: "bfsi-repo"
   _SERVICE_NAME: "bfsi-genai-app"
-  _RUN_SA: "sa-cloudrun-runtime@$PROJECT_ID.iam.gserviceaccount.com"
+  _RUN_SA: "sa-cloudrun-runtime@bfsi-policy-dev-001.iam.gserviceaccount.com"
   _IMAGE_NAME: "bfsi-app"
-  _DATA_BUCKET: "$PROJECT_ID-bfsi-artifacts"
+  _DATA_BUCKET: "haks-mlops-first-bfsi-artifacts"
   _TRAIN_FILE: "training_data/train.jsonl"
   _VAL_FILE: "training_data/val.jsonl"
   _MODEL_REF_SECRET: "bfsi-tuned-model-ref"
@@ -29,19 +27,30 @@ steps:
       - "-c"
       - |
         echo "PROJECT_ID=$PROJECT_ID"
+        echo "COMMIT_SHA=$COMMIT_SHA"
+        echo "BRANCH_NAME=$BRANCH_NAME"
         echo "REGION=${_REGION}"
         echo "DATA_BUCKET=${_DATA_BUCKET}"
+        echo "TRAIN_FILE=${_TRAIN_FILE}"
+        echo "VAL_FILE=${_VAL_FILE}"
+        echo "MODEL_REF_SECRET=${_MODEL_REF_SECRET}"
 
-  - id: "Install Python deps"
+  - id: "Install Python dependencies"
     name: "python:3.11-slim"
     entrypoint: "bash"
     args:
       - "-c"
       - |
+        python -m pip install --upgrade pip
         pip install --no-cache-dir -r app/requirements.txt
-        pip install --no-cache-dir google-cloud-storage google-cloud-secret-manager google-cloud-aiplatform requests pyyaml
+        pip install --no-cache-dir \
+          google-cloud-storage \
+          google-cloud-secret-manager \
+          google-cloud-aiplatform \
+          requests \
+          pyyaml
 
-  - id: "Validate dataset"
+  - id: "Validate training dataset"
     name: "python:3.11-slim"
     entrypoint: "bash"
     args:
@@ -51,7 +60,7 @@ steps:
           --train ${_TRAIN_FILE} \
           --val ${_VAL_FILE}
 
-  - id: "Upload dataset to GCS"
+  - id: "Upload dataset and prompts to GCS"
     name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     entrypoint: "bash"
     args:
@@ -97,7 +106,7 @@ steps:
         export MODEL_REF_SECRET=${_MODEL_REF_SECRET}
         python tuning/evaluate_tuned_model.py
 
-  - id: "Write model ref to Secret Manager"
+  - id: "Write model reference to Secret Manager"
     name: "python:3.11-slim"
     entrypoint: "bash"
     args:
@@ -108,7 +117,7 @@ steps:
         export MODEL_REF_SECRET=${_MODEL_REF_SECRET}
         python tuning/write_model_ref.py
 
-  - id: "Build app image"
+  - id: "Build application image"
     name: "gcr.io/cloud-builders/docker"
     args:
       - "build"
@@ -130,7 +139,7 @@ steps:
       - "push"
       - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:latest"
 
-  - id: "Read tuned model ref"
+  - id: "Read tuned model reference"
     name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     entrypoint: "bash"
     args:
@@ -140,7 +149,7 @@ steps:
           --secret=${_MODEL_REF_SECRET} \
           --project=$PROJECT_ID)
         echo "$MODEL_REF" > /workspace/model_ref.txt
-        echo "Model ref captured"
+        echo "Tuned model reference captured"
 
   - id: "Deploy Cloud Run with tuned model"
     name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
@@ -162,6 +171,7 @@ steps:
           --cpu=2 \
           --timeout=300 \
           --concurrency=20 \
+          --max-instances=10 \
           --set-env-vars=PROJECT_ID=$PROJECT_ID,REGION=${_REGION},TUNED_MODEL_REF=$MODEL_REF
 
 images:
