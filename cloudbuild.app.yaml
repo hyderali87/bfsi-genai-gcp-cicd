@@ -10,4 +10,4 @@ steps:
     entrypoint: "bash"
     args:
       - "-c"
-      - "echo Cloud Build config loaded correctly"
+      - "echo Cloud Build config loaded Correctly"
