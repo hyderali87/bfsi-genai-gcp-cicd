@@ -35,20 +35,14 @@ steps:
         echo "VAL_FILE=${_VAL_FILE}"
         echo "MODEL_REF_SECRET=${_MODEL_REF_SECRET}"
 
-  - id: "Install Python dependencies"
+  - id: "Install app dependencies"
     name: "python:3.11-slim"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        python -m pip install --upgrade pip
-        pip install --no-cache-dir -r app/requirements.txt
-        pip install --no-cache-dir \
-          google-cloud-storage \
-          google-cloud-secret-manager \
-          google-cloud-aiplatform \
-          requests \
-          pyyaml
+        python -m pip install --upgrade pip --root-user-action=ignore
+        pip install --no-cache-dir --root-user-action=ignore -r app/requirements.txt
 
   - id: "Validate training dataset"
     name: "python:3.11-slim"
@@ -58,7 +52,7 @@ steps:
       - |
         python training_data/schema_checks.py --file ${_TRAIN_FILE}
         python training_data/schema_checks.py --file ${_VAL_FILE}
-        
+
   - id: "Upload dataset and prompts to GCS"
     name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     entrypoint: "bash"
@@ -81,11 +75,20 @@ steps:
     args:
       - "-c"
       - |
+        python -m pip install --upgrade pip --root-user-action=ignore
+        pip install --no-cache-dir --root-user-action=ignore \
+          google-cloud-storage \
+          google-cloud-secret-manager \
+          google-cloud-aiplatform \
+          requests \
+          pyyaml
+
         export PROJECT_ID="$PROJECT_ID"
         export REGION="${_REGION}"
         export TRAIN_URI="gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/train.jsonl"
         export VAL_URI="gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/val.jsonl"
         export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
+
         python tuning/submit_tuning_job.py
 
   - id: "Wait for tuning completion"
@@ -94,9 +97,16 @@ steps:
     args:
       - "-c"
       - |
+        python -m pip install --upgrade pip --root-user-action=ignore
+        pip install --no-cache-dir --root-user-action=ignore \
+          google-cloud-secret-manager \
+          google-cloud-aiplatform \
+          requests
+
         export PROJECT_ID="$PROJECT_ID"
         export REGION="${_REGION}"
         export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
+
         python tuning/wait_for_tuning.py
 
   - id: "Evaluate tuned model"
@@ -105,9 +115,17 @@ steps:
     args:
       - "-c"
       - |
+        python -m pip install --upgrade pip --root-user-action=ignore
+        pip install --no-cache-dir --root-user-action=ignore \
+          google-cloud-secret-manager \
+          google-cloud-aiplatform \
+          requests \
+          pyyaml
+
         export PROJECT_ID="$PROJECT_ID"
         export REGION="${_REGION}"
         export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
+
         python tuning/evaluate_tuned_model.py
 
   - id: "Write model reference to Secret Manager"
@@ -116,9 +134,14 @@ steps:
     args:
       - "-c"
       - |
+        python -m pip install --upgrade pip --root-user-action=ignore
+        pip install --no-cache-dir --root-user-action=ignore \
+          google-cloud-secret-manager
+
         export PROJECT_ID="$PROJECT_ID"
         export REGION="${_REGION}"
         export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
+
         python tuning/write_model_ref.py
 
   - id: "Build application image"
