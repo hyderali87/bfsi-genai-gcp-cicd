@@ -1,0 +1,54 @@
+steps:
+  - id: "lint-import-check"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -r app/requirements.txt
+        python -m compileall app
+
+  - id: "build-image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+      - "."
+
+  - id: "push-image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+
+  - id: "deploy-cloud-run"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        gcloud run deploy ${_SERVICE_NAME} \
+          --project=$PROJECT_ID \
+          --region=${_REGION} \
+          --platform=managed \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA \
+          --service-account=${_RUNTIME_SA} \
+          --allow-unauthenticated \
+          --set-env-vars=PROJECT_ID=$PROJECT_ID,REGION=${_REGION},MODEL_SECRET_NAME=${_MODEL_SECRET_NAME},APP_CONFIG_SECRET_NAME=${_APP_CONFIG_SECRET_NAME},API_KEY_SECRET_NAME=${_API_KEY_SECRET_NAME},REQUIRE_API_KEY=${_REQUIRE_API_KEY},SYSTEM_PROMPT_PATH=/app/prompts/system_prompt.txt
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _REGION: "us-central1"
+  _AR_REPO: "bfsi-app-repo"
+  _SERVICE_NAME: "bfsi-genai-app"
+  _RUNTIME_SA: "bfsi-runner@PROJECT_ID.iam.gserviceaccount.com"
+  _MODEL_SECRET_NAME: "current-tuned-model"
+  _APP_CONFIG_SECRET_NAME: "app-config-json"
+  _API_KEY_SECRET_NAME: "bfsi-api-key"
+  _REQUIRE_API_KEY: "false"

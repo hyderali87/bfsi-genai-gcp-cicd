@@ -1,0 +1,129 @@
+steps:
+  - id: "install-deps-and-validate-dataset"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -r app/requirements.txt
+        python training_data/schema_checks.py --file training_data/train.jsonl
+        python training_data/schema_checks.py --file training_data/val.jsonl
+
+  - id: "upload-dataset-to-gcs"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        gsutil cp training_data/train.jsonl gs://${_DATA_BUCKET}/datasets/train-${SHORT_SHA}.jsonl
+        gsutil cp training_data/val.jsonl gs://${_DATA_BUCKET}/datasets/val-${SHORT_SHA}.jsonl
+        gsutil cp prompts/system_prompt.txt gs://${_DATA_BUCKET}/prompts/system_prompt-${SHORT_SHA}.txt
+
+  - id: "submit-tuning-job"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -r app/requirements.txt
+        python tuning/submit_tuning_job.py \
+          --project-id=$PROJECT_ID \
+          --region=${_REGION} \
+          --base-model=${_BASE_MODEL} \
+          --train-uri=gs://${_DATA_BUCKET}/datasets/train-${SHORT_SHA}.jsonl \
+          --val-uri=gs://${_DATA_BUCKET}/datasets/val-${SHORT_SHA}.jsonl \
+          --display-name=${_TUNING_JOB_PREFIX}-${SHORT_SHA} \
+          --output-json=/workspace/tuning_job.json
+
+  - id: "wait-for-tuning"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -r app/requirements.txt
+        python tuning/wait_for_tuning.py \
+          --project-id=$PROJECT_ID \
+          --region=${_REGION} \
+          --job-json=/workspace/tuning_job.json \
+          --output-json=/workspace/tuning_result.json \
+          --poll-seconds=120 \
+          --timeout-seconds=86400
+
+  - id: "evaluate-tuned-model"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install -r app/requirements.txt
+        python tuning/evaluate_tuned_model.py \
+          --project-id=$PROJECT_ID \
+          --region=${_REGION} \
+          --model-json=/workspace/tuning_result.json \
+          --validation-file=training_data/val.jsonl \
+          --min-pass-rate=${_MIN_PASS_RATE} \
+          --output-json=/workspace/eval_result.json
+
+  - id: "promote-model-secret"
+    name: "python:3.11"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install google-cloud-secret-manager
+        python tuning/write_model_ref.py \
+          --project-id=$PROJECT_ID \
+          --secret-name=${_MODEL_SECRET_NAME} \
+          --model-json=/workspace/tuning_result.json
+
+  - id: "build-image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+      - "."
+
+  - id: "push-image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+
+  - id: "deploy-cloud-run"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        gcloud run deploy ${_SERVICE_NAME} \
+          --project=$PROJECT_ID \
+          --region=${_REGION} \
+          --platform=managed \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA \
+          --service-account=${_RUNTIME_SA} \
+          --allow-unauthenticated \
+          --set-env-vars=PROJECT_ID=$PROJECT_ID,REGION=${_REGION},MODEL_SECRET_NAME=${_MODEL_SECRET_NAME},APP_CONFIG_SECRET_NAME=${_APP_CONFIG_SECRET_NAME},API_KEY_SECRET_NAME=${_API_KEY_SECRET_NAME},REQUIRE_API_KEY=${_REQUIRE_API_KEY},SYSTEM_PROMPT_PATH=/app/prompts/system_prompt.txt
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: "86400s"
+
+substitutions:
+  _REGION: "us-central1"
+  _DATA_BUCKET: "REPLACE_DATA_BUCKET"
+  _BASE_MODEL: "gemini-2.5-flash"
+  _TUNING_JOB_PREFIX: "bfsi-tuning-job"
+  _MIN_PASS_RATE: "0.80"
+  _AR_REPO: "bfsi-app-repo"
+  _SERVICE_NAME: "bfsi-genai-app"
+  _RUNTIME_SA: "bfsi-runner@PROJECT_ID.iam.gserviceaccount.com"
+  _MODEL_SECRET_NAME: "current-tuned-model"
+  _APP_CONFIG_SECRET_NAME: "app-config-json"
+  _API_KEY_SECRET_NAME: "bfsi-api-key"
+  _REQUIRE_API_KEY: "false"
