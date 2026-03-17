@@ -68,7 +68,12 @@ steps:
         gsutil cp ${_TRAIN_FILE} gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/train.jsonl
         gsutil cp ${_VAL_FILE} gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/val.jsonl
         gsutil cp prompts/system_prompt.txt gs://${_DATA_BUCKET}/prompts/${COMMIT_SHA}/system_prompt.txt
-        gsutil cp prompts/guardrails.yaml gs://${_DATA_BUCKET}/prompts/${COMMIT_SHA}/guardrails.yaml
+
+        if [ -f prompts/guardrails.yaml ]; then
+          gsutil cp prompts/guardrails.yaml gs://${_DATA_BUCKET}/prompts/${COMMIT_SHA}/guardrails.yaml
+        else
+          echo "prompts/guardrails.yaml not found, skipping optional upload"
+        fi
 
   - id: "Submit Vertex AI tuning job"
     name: "python:3.11-slim"
