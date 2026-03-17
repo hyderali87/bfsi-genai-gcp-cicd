@@ -56,10 +56,9 @@ steps:
     args:
       - "-c"
       - |
-        python training_data/schema_checks.py \
-          --train ${_TRAIN_FILE} \
-          --val ${_VAL_FILE}
-
+        python training_data/schema_checks.py --file ${_TRAIN_FILE}
+        python training_data/schema_checks.py --file ${_VAL_FILE}
+        
   - id: "Upload dataset and prompts to GCS"
     name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     entrypoint: "bash"
