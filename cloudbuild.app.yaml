@@ -40,8 +40,11 @@ steps:
 images:
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
     
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['echo', 'Hello world!']
 options:
-  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+  logging: CLOUD_LOGGING_ONLY
 
 substitutions:
   _REGION: "us-central1"
