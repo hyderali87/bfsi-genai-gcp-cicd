@@ -14,7 +14,7 @@ substitutions:
   _SERVICE_NAME: "bfsi-genai-app"
   _RUN_SA: "sa-cloudrun-runtime@bfsi-policy-dev-001.iam.gserviceaccount.com"
   _IMAGE_NAME: "bfsi-app"
-  _DATA_BUCKET: "haks-mlops-first-bfsi-artifacts"
+  _DATA_BUCKET: "bfsi-policy-dev-001-artifacts"
   _TRAIN_FILE: "training_data/train.jsonl"
   _VAL_FILE: "training_data/val.jsonl"
   _MODEL_REF_SECRET: "bfsi-tuned-model-ref"
