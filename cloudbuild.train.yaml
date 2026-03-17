@@ -147,7 +147,7 @@ steps:
         python tuning/write_model_ref.py \
           --project-id "$PROJECT_ID" \
           --secret-name "${_MODEL_REF_SECRET}" \
-          --result-json "/workspace/tuning_result.json"
+          --model-json "/workspace/tuning_result.json"
 
   - id: "Build application image"
     name: "gcr.io/cloud-builders/docker"
