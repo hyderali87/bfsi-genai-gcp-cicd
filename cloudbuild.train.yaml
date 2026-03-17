@@ -18,6 +18,8 @@ substitutions:
   _TRAIN_FILE: "training_data/train.jsonl"
   _VAL_FILE: "training_data/val.jsonl"
   _MODEL_REF_SECRET: "bfsi-tuned-model-ref"
+  _BASE_MODEL: "gemini-2.5-flash"
+  _TUNING_DISPLAY_NAME: "bfsi-llm-tuning"
 
 steps:
   - id: "Show build context"
@@ -83,13 +85,14 @@ steps:
           requests \
           pyyaml
 
-        export PROJECT_ID="$PROJECT_ID"
-        export REGION="${_REGION}"
-        export TRAIN_URI="gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/train.jsonl"
-        export VAL_URI="gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/val.jsonl"
-        export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
-
-        python tuning/submit_tuning_job.py
+        python tuning/submit_tuning_job.py \
+          --project-id "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --base-model "${_BASE_MODEL}" \
+          --train-uri "gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/train.jsonl" \
+          --val-uri "gs://${_DATA_BUCKET}/datasets/${COMMIT_SHA}/val.jsonl" \
+          --display-name "${_TUNING_DISPLAY_NAME}-${COMMIT_SHA}" \
+          --output-json "/workspace/tuning_job.json"
 
   - id: "Wait for tuning completion"
     name: "python:3.11-slim"
