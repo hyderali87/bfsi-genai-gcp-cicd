@@ -1,6 +1,6 @@
 timeout: "86400s"
 
-logsBucket: "gs://haks-mlops-first-cloudbuild-logs"
+logsBucket: "gs://bfsi-policy-dev-001-cloudbuild-logs"
 
 options:
   logging: GCS_ONLY
@@ -12,7 +12,7 @@ substitutions:
   _REGION: "us-central1"
   _AR_REPO: "bfsi-repo"
   _SERVICE_NAME: "bfsi-genai-app"
-  _RUN_SA: "sa-cloudrun-runtime@haks-mlops-first.iam.gserviceaccount.com"
+  _RUN_SA: "sa-cloudrun-runtime@bfsi-policy-dev-001.iam.gserviceaccount.com"
   _IMAGE_NAME: "bfsi-app"
   _DATA_BUCKET: "haks-mlops-first-bfsi-artifacts"
   _TRAIN_FILE: "training_data/train.jsonl"
