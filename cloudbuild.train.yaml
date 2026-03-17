@@ -1,6 +1,6 @@
 timeout: "86400s"
 
-logsBucket: "gs://bfsi-policy-dev-001-cloudbuild-logs"
+logsBucket: "gs://haks-mlops-first-cloudbuild-logs"
 
 options:
   logging: GCS_ONLY
@@ -12,7 +12,7 @@ substitutions:
   _REGION: "us-central1"
   _AR_REPO: "bfsi-repo"
   _SERVICE_NAME: "bfsi-genai-app"
-  _RUN_SA: "sa-cloudrun-runtime@bfsi-policy-dev-001.iam.gserviceaccount.com"
+  _RUN_SA: "sa-cloudrun-runtime@haks-mlops-first.iam.gserviceaccount.com"
   _IMAGE_NAME: "bfsi-app"
   _DATA_BUCKET: "haks-mlops-first-bfsi-artifacts"
   _TRAIN_FILE: "training_data/train.jsonl"
@@ -172,7 +172,7 @@ steps:
           --timeout=300 \
           --concurrency=20 \
           --max-instances=10 \
-          --set-env-vars=PROJECT_ID=$PROJECT_ID,REGION=${_REGION},TUNED_MODEL_REF=$MODEL_REF
+          --set-env-vars=PROJECT_ID=$PROJECT_ID,REGION=${_REGION},TUNED_MODEL_REF=$$MODEL_REF
 
 images:
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"
