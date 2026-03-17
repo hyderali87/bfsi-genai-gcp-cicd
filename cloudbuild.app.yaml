@@ -40,6 +40,10 @@ steps:
 images:
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
 
+steps:
+  - name: gcr.io/cloud-builders/gcloud
+    args: ["version"]
+    
 options:
   logging: CLOUD_LOGGING_ONLY
 
