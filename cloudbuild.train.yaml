@@ -129,7 +129,9 @@ steps:
         python tuning/evaluate_tuned_model.py \
           --project-id "$PROJECT_ID" \
           --region "${_REGION}" \
-          --result-json "/workspace/tuning_result.json" \
+          --model-json "/workspace/tuning_result.json" \
+          --validation-file "${_VAL_FILE}" \
+          --min-pass-rate "0.80" \
           --output-json "/workspace/evaluation_result.json"
 
   - id: "Write model reference to Secret Manager"
