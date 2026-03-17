@@ -36,6 +36,7 @@ steps:
         echo "TRAIN_FILE=${_TRAIN_FILE}"
         echo "VAL_FILE=${_VAL_FILE}"
         echo "MODEL_REF_SECRET=${_MODEL_REF_SECRET}"
+        echo "BASE_MODEL=${_BASE_MODEL}"
 
   - id: "Install app dependencies"
     name: "python:3.11-slim"
@@ -102,15 +103,16 @@ steps:
       - |
         python -m pip install --upgrade pip --root-user-action=ignore
         pip install --no-cache-dir --root-user-action=ignore \
-          google-cloud-secret-manager \
           google-cloud-aiplatform \
           requests
 
-        export PROJECT_ID="$PROJECT_ID"
-        export REGION="${_REGION}"
-        export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
-
-        python tuning/wait_for_tuning.py
+        python tuning/wait_for_tuning.py \
+          --project-id "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --job-json "/workspace/tuning_job.json" \
+          --output-json "/workspace/tuning_result.json" \
+          --poll-seconds 60 \
+          --timeout-seconds 43200
 
   - id: "Evaluate tuned model"
     name: "python:3.11-slim"
@@ -120,16 +122,15 @@ steps:
       - |
         python -m pip install --upgrade pip --root-user-action=ignore
         pip install --no-cache-dir --root-user-action=ignore \
-          google-cloud-secret-manager \
           google-cloud-aiplatform \
           requests \
           pyyaml
 
-        export PROJECT_ID="$PROJECT_ID"
-        export REGION="${_REGION}"
-        export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
-
-        python tuning/evaluate_tuned_model.py
+        python tuning/evaluate_tuned_model.py \
+          --project-id "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --result-json "/workspace/tuning_result.json" \
+          --output-json "/workspace/evaluation_result.json"
 
   - id: "Write model reference to Secret Manager"
     name: "python:3.11-slim"
@@ -141,11 +142,10 @@ steps:
         pip install --no-cache-dir --root-user-action=ignore \
           google-cloud-secret-manager
 
-        export PROJECT_ID="$PROJECT_ID"
-        export REGION="${_REGION}"
-        export MODEL_REF_SECRET="${_MODEL_REF_SECRET}"
-
-        python tuning/write_model_ref.py
+        python tuning/write_model_ref.py \
+          --project-id "$PROJECT_ID" \
+          --secret-name "${_MODEL_REF_SECRET}" \
+          --result-json "/workspace/tuning_result.json"
 
   - id: "Build application image"
     name: "gcr.io/cloud-builders/docker"
